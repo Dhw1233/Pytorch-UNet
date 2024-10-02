@@ -35,10 +35,10 @@ def predict_img(net,
 
 def get_args():
     parser = argparse.ArgumentParser(description='Predict masks from input images')
-    parser.add_argument('--model', '-m', default='MODEL.pth', metavar='FILE',
+    parser.add_argument('--model', '-m', default='/home/SegContest/model/Pytorch-UNet/checkpoints/checkpoint_epoch30.pth', metavar='FILE',
                         help='Specify the file in which the model is stored')
-    parser.add_argument('--input', '-i', metavar='INPUT', nargs='+', help='Filenames of input images', required=True)
-    parser.add_argument('--output', '-o', metavar='OUTPUT', nargs='+', help='Filenames of output images')
+    parser.add_argument('--input', '-i', default='/home/SegContest/model/NEU_Seg-main/images/test', nargs='+', help='Filenames of input images')
+    parser.add_argument('--output', '-o', default='/home/SegContest/model/Pytorch-UNet/predict', nargs='+', help='Filenames of output images')
     parser.add_argument('--viz', '-v', action='store_true',
                         help='Visualize the images as they are processed')
     parser.add_argument('--no-save', '-n', action='store_true', help='Do not save the output masks')
@@ -80,8 +80,14 @@ if __name__ == '__main__':
     args = get_args()
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
 
-    in_files = args.input
-    out_files = get_output_filenames(args)
+    in_files = []
+    out_files = []
+    for filename in os.listdir(args.input):
+        if os.path.isfile(os.path.join(args.input, filename)):
+            in_files.append(os.path.join(args.input, filename))
+            out_files.append(os.path.join(args.output,filename))
+    # print(in_files)
+    
 
     net = UNet(n_channels=3, n_classes=args.classes, bilinear=args.bilinear)
 
@@ -98,6 +104,7 @@ if __name__ == '__main__':
 
     for i, filename in enumerate(in_files):
         logging.info(f'Predicting image {filename} ...')
+        # print(filename)
         img = Image.open(filename)
 
         mask = predict_img(net=net,
@@ -107,10 +114,10 @@ if __name__ == '__main__':
                            device=device)
 
         if not args.no_save:
-            out_filename = out_files[i]
+            # out_filename = str(os.path.join(args.output,filename))
             result = mask_to_image(mask, mask_values)
-            result.save(out_filename)
-            logging.info(f'Mask saved to {out_filename}')
+            result.save(out_files[i])
+            logging.info(f'Mask saved to {out_files[i]}')
 
         if args.viz:
             logging.info(f'Visualizing results for image {filename}, close to continue...')
