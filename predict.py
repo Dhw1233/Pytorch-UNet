@@ -29,13 +29,12 @@ def predict_img(net,
             mask = output.argmax(dim=1)
         else:
             mask = torch.sigmoid(output) > out_threshold
-
     return mask[0].long().squeeze().numpy()
 
 
 def get_args():
     parser = argparse.ArgumentParser(description='Predict masks from input images')
-    parser.add_argument('--model', '-m', default='/home/SegContest/model/Pytorch-UNet/checkpoints/checkpoint_epoch30.pth', metavar='FILE',
+    parser.add_argument('--model', '-m', default='/home/SegContest/model/Pytorch-UNet/checkpoints/checkpoint_epoch50.pth', metavar='FILE',
                         help='Specify the file in which the model is stored')
     parser.add_argument('--input', '-i', default='/home/SegContest/model/NEU_Seg-main/images/test', nargs='+', help='Filenames of input images')
     parser.add_argument('--output', '-o', default='/home/SegContest/model/Pytorch-UNet/predict', nargs='+', help='Filenames of output images')
@@ -71,15 +70,13 @@ def mask_to_image(mask: np.ndarray, mask_values):
         mask = np.argmax(mask, axis=0)
 
     for i, v in enumerate(mask_values):
-        out[mask == i] = v
-
-    return Image.fromarray(out)
+        out[mask == i] = v 
+    return Image.fromarray(out),out
 
 
 if __name__ == '__main__':
     args = get_args()
     logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-
     in_files = []
     out_files = []
     for filename in os.listdir(args.input):
@@ -90,19 +87,20 @@ if __name__ == '__main__':
     
 
     net = UNet(n_channels=3, n_classes=args.classes, bilinear=args.bilinear)
-
+    print(sum([p.numel() for name,p in net.named_parameters()]))
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     logging.info(f'Loading model {args.model}')
     logging.info(f'Using device {device}')
 
     net.to(device=device)
     state_dict = torch.load(args.model, map_location=device)
-    mask_values = state_dict.pop('mask_values', [0, 1])
+    mask_values = state_dict.pop('mask_values', [0, 1, 2, 3])
     net.load_state_dict(state_dict)
 
     logging.info('Model loaded!')
 
     for i, filename in enumerate(in_files):
+
         logging.info(f'Predicting image {filename} ...')
         # print(filename)
         img = Image.open(filename)
@@ -112,11 +110,11 @@ if __name__ == '__main__':
                            scale_factor=args.scale,
                            out_threshold=args.mask_threshold,
                            device=device)
-
         if not args.no_save:
             # out_filename = str(os.path.join(args.output,filename))
-            result = mask_to_image(mask, mask_values)
+            result,out = mask_to_image(mask, mask_values)
             result.save(out_files[i])
+            np.save(os.path.join(args.output,f"{i}.npy"),out)
             logging.info(f'Mask saved to {out_files[i]}')
 
         if args.viz:
